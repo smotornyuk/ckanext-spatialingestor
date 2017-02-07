@@ -1,0 +1,5 @@
+ckan
+psycopg2
+pylons
+python-dateutil
+requests

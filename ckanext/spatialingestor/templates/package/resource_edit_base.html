@@ -1,0 +1,7 @@
+{% ckan_extends %}
+{% block content_primary_nav %}
+{{ super() }}
+{% if 'spatialingestor' in g.plugins and h.spatialingestor_is_spatially_ingestible_resource(res) %}
+{{ h.build_nav_icon('resource_spatialingest', _('Spatial Ingest'), resource_id=res.id) }}
+{% endif %}
+{% endblock %}
