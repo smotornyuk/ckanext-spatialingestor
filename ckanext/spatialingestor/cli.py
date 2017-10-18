@@ -9,7 +9,20 @@ from ckan.plugins import toolkit
 from pylons import config
 
 from ckanext.spatialingestor.helpers import log
-from ckanext.spatialingestor.plugin import _ingest_resource as ingest_resource, _purge_resource as purge_resource
+
+def ingest_resource(id, _):
+    res = toolkit.get_action('resource_show')({'ignore_auth': True}, {'id': id})
+    return toolkit.get_action('spatialingestor_ingest_resource')({
+        'user': config.get('ckan.spatialingestor.ckan_user', 'default')}, res)
+
+
+def purge_resource(id):
+    try:
+        res = toolkit.get_action('resource_show')({'ignore_auth': True}, {'id': id})
+    except toolkit.ObjectNotFound:
+        return
+    return toolkit.get_action('spatialingestor_purge_resource_datastores')({
+        'user': config.get('ckan.spatialingestor.ckan_user', 'default')}, res)
 
 
 class SpatialIngestorCommand(cli.CkanCommand):
@@ -24,6 +37,18 @@ class SpatialIngestorCommand(cli.CkanCommand):
 
     summary = __doc__.split('\n')[0]
     usage = __doc__
+
+    def _confirm_or_abort(self):
+        question = (
+           "Data in any datastore resource that isn't in their source files "
+            "(e.g. data added using the datastore API) will be permanently "
+            "lost. Are you sure you want to proceed?"
+        )
+
+        answer = cli.query_yes_no(question, default=None)
+        if not answer == 'yes':
+            print "Aborting..."
+            sys.exit(0)
 
     def command(self):
         if self.args and self.args[0] == 'purge':
@@ -74,17 +99,10 @@ class SpatialIngestorCommand(cli.CkanCommand):
 
         log.info("Purging spatially ingested resources from package {0}...".format(pkg_dict['name']))
 
-        context = {'user': toolkit.get_action('user_show')({'ignore_auth': True}, {
-            'id': config.get('ckan.spatialingestor.ckan_user', 'default')
-        })}
-
         for res in pkg_dict['resources']:
-            purge_resource(context, res['id'])
+            purge_resource(res['id'])
 
     def _purge_all(self):
-        context = {'user': toolkit.get_action('user_show')({'ignore_auth': True}, {
-            'id': config.get('ckan.spatialingestor.ckan_user', 'default')
-        })}
 
         pkg_ids = [r[0] for r in model.Session.query(model.Package.id).filter(model.Package.state != 'deleted').all()]
 
@@ -98,7 +116,7 @@ class SpatialIngestorCommand(cli.CkanCommand):
             pkg_dict = model.Package.get(pkg_id).as_dict()
             try:
                 for res in pkg_dict['resources']:
-                    purge_resource(context, res['id'])
+                    purge_resource(res['id'])
             except Exception, e:
                 log.error("Processing {0} failed with error {1}, continuing...".format(pkg_dict['name'], str(e)))
 
@@ -109,18 +127,10 @@ class SpatialIngestorCommand(cli.CkanCommand):
 
         log.info("Re-ingesting spatial resources for package {0}...".format(pkg_dict['name']))
 
-        context = {'user': toolkit.get_action('user_show')({'ignore_auth': True}, {
-            'id': config.get('ckan.spatialingestor.ckan_user', 'default')
-        })}
-
         for res in pkg_dict['resources']:
-            ingest_resource(context, res['id'], False)
+            ingest_resource(res['id'], False)
 
     def _reingest_all(self):
-        context = {'user': toolkit.get_action('user_show')({'ignore_auth': True}, {
-            'id': config.get('ckan.spatialingestor.ckan_user', 'default')
-        })}
-
         pkg_ids = [r[0] for r in model.Session.query(model.Package.id).filter(model.Package.state != 'deleted').all()]
 
         log.info("Re-ingesting spatial resources for all packages...")
@@ -132,7 +142,7 @@ class SpatialIngestorCommand(cli.CkanCommand):
             pkg_dict = model.Package.get(pkg_id).as_dict()
             try:
                 for res in pkg_dict['resources']:
-                    ingest_resource(context, res['id'], False)
+                    ingest_resource(res['id'], False)
             except Exception, e:
                 log.error("Processing {0} failed with error {1}, continuing...".format(pkg_dict['name'], str(e)))
 

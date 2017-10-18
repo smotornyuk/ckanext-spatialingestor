@@ -24,6 +24,6 @@ setup(
         spatialingestor=ckanext.spatialingestor.plugin:SpatialIngestorPlugin
 
         [paste.paster_command]
-        spatialingestor = ckanext.spatialingestor.cli:SpatialIngestorCommand
+        spatialingestor=ckanext.spatialingestor.cli:SpatialIngestorCommand
     """,
 )

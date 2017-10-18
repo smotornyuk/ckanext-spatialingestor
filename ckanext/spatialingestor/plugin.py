@@ -28,22 +28,16 @@ class SpatialIngestorPlugin(plugins.SingletonPlugin):
     def notify(self, entity, operation=None):
         if isinstance(entity, model.Resource):
             resource_dict = model.Resource.get(entity.id).as_dict()
-            if helpers.is_spatially_ingestible_resource(resource_dict):
-                d_type = model.domain_object.DomainObjectOperation
-                auto_ingest = toolkit.asbool(config.get('ckan.spatialingestor.auto_ingest', 'False'))
-                is_spatial_parent = toolkit.asbool(resource_dict.get('spatial_parent', 'False'))
-                if operation == d_type.deleted or entity.state == 'deleted':
-                    helpers.log.error(">>>>>>> Registered Purge Trigger")
-                    toolkit.get_action('spatialingestor_purge_resource_datastores')({}, resource_dict)
+            if not helpers.is_spatially_ingestible_resource(resource_dict):
+                return
+            d_type = model.domain_object.DomainObjectOperation
+            auto_ingest = toolkit.asbool(config.get('ckan.spatialingestor.auto_ingest', 'False'))
+            is_spatial_parent = toolkit.asbool(resource_dict.get('spatial_parent', 'False'))
 
-                    package_dict = model.Package.get(resource_dict['package_id']).as_dict()
-                    if package_dict['state'] != 'deleted':
-                        helpers.log.error(">>>>>>> Registered Orphan Delete Trigger")
-                        toolkit.get_action('spatialingestor_delete_orphaned_resources')({}, package_dict)
-                elif (is_spatial_parent and (operation == d_type.changed or not operation)) or (
-                        operation == d_type.new and auto_ingest):
-                    helpers.log.error(">>>>>>> Registered Ingest Trigger")
-                    toolkit.get_action('spatialingestor_ingest_resource')({}, resource_dict)
+            if (is_spatial_parent and (operation == d_type.changed or not operation)) or (
+                    operation == d_type.new and auto_ingest):
+                helpers.log.error(">>>>>>> Registered Ingest Trigger")
+                toolkit.get_action('spatialingestor_ingest_resource')({}, resource_dict)
 
     def before_map(self, m):
         m.connect(
@@ -58,7 +52,7 @@ class SpatialIngestorPlugin(plugins.SingletonPlugin):
                 'spatialingestor_status': action.spatialingestor_status,
                 'spatialingestor_ingest_resource': action.ingest_resource,
                 'spatialingestor_purge_resource_datastores': action.purge_resource_datastores,
-                'spatialingestor_delete_orphaned_resources': action.delete_orphaned_resources}
+            }
 
     def get_auth_functions(self):
         return {'spatialingestor_job_submit': auth.spatialingestor_job_submit,

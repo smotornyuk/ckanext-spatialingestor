@@ -128,7 +128,6 @@ def spatialingestor_hook(context, data_dict):
     :param task_info: message list of task steps
     :type tast_info: list[string]
     '''
-
     metadata, status = _get_or_bust(data_dict, ['metadata', 'status'])
     job_type = 'spatial_ingest'
 
@@ -179,7 +178,7 @@ def spatialingestor_hook(context, data_dict):
             resubmit = True
 
     context['ignore_auth'] = True
-    toolkit.get_action('task_status_update')(context, task)
+    resp = toolkit.get_action('task_status_update')(context, task)
 
     if resubmit:
         log.debug('Resource {0} has been modified, '
@@ -232,6 +231,7 @@ def spatialingestor_status(context, data_dict):
 
 
 def ingest_resource(context, resource_dict):
+    # import pdb; pdb.set_trace()
     if toolkit.asbool(resource_dict.get('spatial_parent', 'False')):
         try:
             task = toolkit.get_action('task_status_show')(
@@ -285,61 +285,54 @@ def purge_resource_datastores(context, resource_dict):
     # the Spatialingestor microservice will not be able to query CKAN to find
     # child spatial resources. So, this must be done in this thread with the IDs
     # passed back to the micro-service
-
+    # import pdb; pdb.set_trace()
     if toolkit.asbool(resource_dict.get('spatial_parent', 'False')):
         # We have a spatial parent, so we have to get all the child resources
-        try:
-            # Make sure there is no other purginging process is running
-            task = toolkit.get_action('task_status_show')(
-                {
-                    'ignore_auth': True
-                }, {
-                    'entity_id': resource_dict['id'],
-                    'task_type': 'spatial_purge',
-                    'key': 'spatialingestor'
-                })
 
-            if task.get('state') in ['init', 'pending']:
-                log.debug(
-                    'Skipping spatial ingestor purge for resource {0}'.format(resource_dict['id']))
-                return
-        except toolkit.ObjectNotFound:
-            pass
+        # FIXME: Do we really need this? it looks, like we are getting 'pending'
+        # job every time, so no purge happens at all
+        # try:
+        #     # Make sure there is no other purginging process is running
+        #     task = toolkit.get_action('task_status_show')(
+        #         {
+        #             'ignore_auth': True
+        #         }, {
+        #             'entity_id': resource_dict['id'],
+        #             'task_type': 'spatial_purge',
+        #             'key': 'spatialingestor'
+        #         })
+
+        #     if task.get('state') in ['init', 'pending']:
+        #         log.debug(
+        #             'Skipping spatial ingestor purge for resource {0}'.format(resource_dict['id']))
+        #         return
+        # except toolkit.ObjectNotFound:
+        #     pass
 
         log.debug(
             'Submitting job to purge PostGIS and Geoserver assets linked to resource {0}'.format(resource_dict['id']))
 
         # Submit request to microservice to clean out Geoserver and PostGIS assets
-        # We also have the micro service handle deleting the child resources, as CKAN seems to be incapable
-        # of doing this consistently via a local resource_delete
-        model = context['model']
+        # Then remove all children of current resource
+        pkg_dict = toolkit.get_action('package_show')(
+            {'ignore_auth': True},
+            {'id': resource_dict['package_id']})
         toolkit.get_action('spatialingestor_job_submit')(context, {
             'resource_id': resource_dict['id'],
-            'package_name': model.Package.get(resource_dict['package_id']).name,
+            'package_name': pkg_dict['name'],
             'job_type': 'spatial_purge'
         })
-
-
-def delete_orphaned_resources(context, pkg_dict):
-    spatial_parent_ids = []
-    spatial_children = []
-    invalid_ids = []
-
-    for res in pkg_dict['resources']:
-        if toolkit.asbool(res.get('spatial_parent', 'False')):
-            spatial_parent_ids.append(res['id'])
-        elif res.get('spatial_child_of', '') != '':
-            spatial_children.append((res['id'], res['spatial_child_of']))
-
-    for child_id, parent_id in spatial_children:
-        if parent_id not in spatial_parent_ids:
-            invalid_ids.append(child_id)
-
-    model = context['model']
-
-    for res in pkg_dict['resources']:
-        if res['id'] in invalid_ids:
-            del_dict = dict(state='deleted')
-            model.Session.query(model.Resource).filter_by(id=res['id']).update(del_dict)
-
+        children = [
+            r['id'] for r in filter(
+                lambda res: res.get('spatial_child_of') == resource_dict['id'], 
+                pkg_dict['resources'])]
+        children = [
+            res['id'] for res in 
+            pkg_dict['resources'] 
+            if res.get('spatial_child_of') == resource_dict['id']
+        ]
+        for child in children:
+            toolkit.get_action('resource_delete')({
+                'user': context['user'], 'model': context['model']}, {
+                    'id': child})
 
