@@ -44,14 +44,15 @@ class SpatialIngestorCommand(cli.CkanCommand):
             "(e.g. data added using the datastore API) will be permanently "
             "lost. Are you sure you want to proceed?"
         )
-
         answer = cli.query_yes_no(question, default=None)
         if not answer == 'yes':
             print "Aborting..."
             sys.exit(0)
 
     def command(self):
-        if self.args and self.args[0] == 'purge':
+        if not self.args:
+            print(self.usage)
+        elif self.args[0] == 'purge':
             if len(self.args) != 2:
                 print "This command requires an argument\n"
                 print self.usage
@@ -59,12 +60,12 @@ class SpatialIngestorCommand(cli.CkanCommand):
 
             self._load_config()
             self._purge(self.args[1])
-        elif self.args and self.args[0] == 'purgeall':
+        elif self.args[0] == 'purgeall':
             self._confirm_or_abort()
 
             self._load_config()
             self._purge_all()
-        elif self.args and self.args[0] == 'reingest':
+        elif self.args[0] == 'reingest':
             self._confirm_or_abort()
 
             if len(self.args) != 2:
@@ -74,12 +75,12 @@ class SpatialIngestorCommand(cli.CkanCommand):
 
             self._load_config()
             self._reingest(self.args[1])
-        elif self.args and self.args[0] == 'reingestall':
+        elif self.args[0] == 'reingestall':
             self._confirm_or_abort()
 
             self._load_config()
             self._reingest_all()
-        elif self.args and self.args[0] == 'purgelegacyall':
+        elif self.args[0] == 'purgelegacyall':
             question = (
                 "All resources ingested with the old spatial ingestor script "
                 "will be permanently deleted. Reingesting with the new spatial "
@@ -91,8 +92,17 @@ class SpatialIngestorCommand(cli.CkanCommand):
 
             self._load_config()
             self._submit_package(self.args[1])
+        elif self.args[0] == 'ingest-styles':
+            self._load_config()
+            self._ingest_styles(self.args[1])
+
         else:
             print self.usage
+
+    def _ingest_styles(self, resource_id):
+        return toolkit.get_action('spatialingestor_ingest_styles')({
+            'user': config.get('ckan.spatialingestor.ckan_user', 'default')}, {
+                'resource_id': resource_id})
 
     def _purge(self, pkg_id):
         pkg_dict = model.Package.get(pkg_id).as_dict()

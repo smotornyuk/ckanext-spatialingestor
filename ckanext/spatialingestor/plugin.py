@@ -28,6 +28,11 @@ class SpatialIngestorPlugin(plugins.SingletonPlugin):
     def notify(self, entity, operation=None):
         if isinstance(entity, model.Resource):
             resource_dict = model.Resource.get(entity.id).as_dict()
+            if 'SLD' in resource_dict.get('format', '').upper():
+                print('INGESTING STYLES')
+                toolkit.get_action('spatialingestor_ingest_styles')({}, {
+                    'resource_id': entity.id
+                })
             if not helpers.is_spatially_ingestible_resource(resource_dict):
                 return
             d_type = model.domain_object.DomainObjectOperation
@@ -52,6 +57,7 @@ class SpatialIngestorPlugin(plugins.SingletonPlugin):
                 'spatialingestor_status': action.spatialingestor_status,
                 'spatialingestor_ingest_resource': action.ingest_resource,
                 'spatialingestor_purge_resource_datastores': action.purge_resource_datastores,
+                'spatialingestor_ingest_styles': action.ingest_styles,
             }
 
     def get_auth_functions(self):

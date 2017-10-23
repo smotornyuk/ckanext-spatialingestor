@@ -58,7 +58,7 @@ def is_resource_blacklisted(resource):
 def get_spatial_input_format(resource):
     check_string = resource.get('__extras', {}).get('format', resource.get('format', resource.get('url', ''))).upper()
 
-    if any([check_string.endswith(x) for x in ["SHP", "SHAPEFILE"]]):
+    if any([x in check_string for x in ["SHP", "SHAPEFILE"]]):
         return 'SHP'
     elif check_string.endswith("KML"):
         return 'KML'
@@ -71,8 +71,10 @@ def get_spatial_input_format(resource):
 
 
 def is_spatially_ingestible_resource(resource):
-    return get_spatial_input_format(resource) and not resource.get('spatial_child_of',
-                                                                   '') and not is_resource_blacklisted(resource)
+    _format = get_spatial_input_format(resource)
+    child_of = resource.get('spatial_child_of', '')
+    is_blacklisted = is_resource_blacklisted(resource)
+    return _format and not child_of and not is_blacklisted
 
 
 def spatialingestor_status_description(status):

@@ -230,9 +230,17 @@ def spatialingestor_status(context, data_dict):
     }
 
 
+def ingest_styles(context, data_dict):
+    resource_id = data_dict.get('resource_id')
+    toolkit.get_action('spatialingestor_job_submit')(context, {
+        'resource_id': resource_id,
+        'job_type': 'spatial_update_styles'
+    })
+    
+
 def ingest_resource(context, resource_dict):
-    # import pdb; pdb.set_trace()
     if toolkit.asbool(resource_dict.get('spatial_parent', 'False')):
+
         try:
             task = toolkit.get_action('task_status_show')(
                 {
@@ -261,6 +269,7 @@ def ingest_resource(context, resource_dict):
         except toolkit.ValidationError, e:
             log.error(e)
     elif is_spatially_ingestible_resource(resource_dict):
+
         try:
             dataset = toolkit.get_action('package_show')(context, {
                 'id': resource_dict['package_id'],
