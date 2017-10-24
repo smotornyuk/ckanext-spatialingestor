@@ -66,6 +66,8 @@ def get_spatial_input_format(resource):
         return 'KMZ'
     elif check_string.endswith("GRID"):
         return 'GRID'
+    elif check_string.endswith("TAB"):
+        return 'TAB'
     else:
         return None
 
